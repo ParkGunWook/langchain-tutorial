@@ -1,0 +1,14 @@
+# Test your FastAPI endpoints
+
+GET http://127.0.0.1:8000/model
+Accept: application/json
+
+###
+
+GET http://127.0.0.1:8000/translate/Hello,World!
+Accept: application/json
+
+###
+
+GET http://127.0.0.1:8000/korean/translate?sentence="Say hello to langchain"
+Accept: application/json
