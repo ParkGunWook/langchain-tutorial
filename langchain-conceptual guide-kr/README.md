@@ -161,3 +161,143 @@ model이 작동하는 방식을 보여준다. 모든 model 제공자가 지원�
 OpenAI's의 `function`과 `tool` message 타입을 구별한다. message는 `tool_call_id`를 가지고 있고 사용된 tool의 id를 전달하는데 사용된다.
 
 ## Prompt templates
+
+Prompt templates은 유저의 입력과 파라미터를 language model을 위한 명령어로 변경한다. model의 응답에 대한 이해와 신뢰성있고 일관적인 언어 기반의 출력으로 생성한다.
+Prompt templates은 dictionary로 입력을 받고, key는 prompt templates이 채워야하는 변수를 의미한다.
+Prompt templates의 출력은 PromptValue이다. PromptValue은 LLM 또는 ChatModel로 전달될 수 있고 일련의 메시지로 캐스팅된다. PromptValue이 존재하는 이유는 strings과 messages사이에서 변환되기 쉽기 때문이다.
+다음과 같은 Prompt templates이 있다.
+
+### String PromptTemplates
+
+단일 문자열을 format하고 단순한 입력에서 사용된다. 예시는 다음과 같다.
+```python
+from langchain_core.prompts import PromptTemplate
+
+prompt_template = PromptTemplate.from_template("Tell me a joke about {topic}")
+
+prompt_template.invoke({"topic": "cats"})
+```
+
+### ChatPromptTemplates
+
+문자열들을 format한다. 여러개의 템플릿들을 가지고 있다. 예시는 다음과 같다.
+```python
+from langchain_core.prompts import ChatPromptTemplate
+
+prompt_template = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful assistant"),
+    ("user", "Tell me a joke about {topic}")
+])
+
+prompt_template.invoke({"topic": "cats"})
+```
+
+위의 예시에서, ChatPromptTemplate은 호출과 동시에 두개의 메시지를 생성한다. 첫번째는 system message이고 format할 변수가 없다. 두번째는 HumanMessage이고 유저가 입력한 `topic` 변수로 format된다.
+
+### MessagesPlaceholder
+
+특정한 위치에 메시지들을 추가하는 prompt template이다. 위의 ChatPromptTemplate에서 두개의 메시지를 format하는 방법을 알아보았다. 유저가 특정 위치에 메시지들을 넘겨주게 하고 싶을 때는 어떻게 해야할까? 아래는 MessagesPlaceholder의 예시이다.
+
+```python
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import HumanMessage
+
+prompt_template = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful assistant"),
+    MessagesPlaceholder("msgs")
+])
+
+prompt_template.invoke({"msgs": [HumanMessage(content="hi!")]})
+```
+
+위의 코드는 두개의 메시지를 만들 것이다. 첫번째는 system message이고 우리가 전달할 HumanMessage이다. 만약 5개의 메시지를 전달한다면, 6개의 메시지를 생성한다. 이것은 특정 위치에 메시지를 배치하는데 유용하다.
+
+MessagesPlaceholder 없이 사용하는 방식은 다음과 같다.
+```python
+from langchain_core.prompts import ChatPromptTemplate
+
+prompt_template = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful assistant"),
+    ("placeholder", "{msgs}") # <-- This is the changed part
+])
+```
+
+## Example selectors
+
+더 나은 성능을 얻기 위한 일반적인 prompting technique은 예시를 prompt에 포함하는 것이다. language model에게 어떻게 행동해야하는지 예시를 주는 것이다. 이러한 예시들은 prompt에 하드코딩되어야 할 수 있지만, 동적으로 그들을 선택할 수 있을 것이다. Example Selectors은 prompts에 examples를 고르고 formatting하는 클래스이다.
+
+## Output parsers
+
+> 다양한 모델들이 점차 function (or tool) calling을 자동으로 지원한다. output parsing을 사용하기보다는 function/tool calling를 추천한다.
+
+모델의 출력을 받고 다음 작업을 위한 포맷으로 변환하는 클래스이다. LLMs을 사용하면서 구조화된 데이터를 생성하거나 chat models과 LLMs으로부터의 출력을 정규화하는 데에 유용하다.
+LangChain은 다양한 output parsers를 가지고 있다.
+
+[다양한 output parser는 여기에서](https://python.langchain.com/v0.2/docs/concepts/#output-parsers)
+
+## Chat history
+
+대부분의 LLM 어플리케이션은 대화형 인터페이스를 가지고 있다. 대화에서의 중요한 점은 이전의 대화에서 얻은 정보이다. 최소한 대화형 시스템은 이전 메시지에 접근할 수 있어야 한다. 
+ChatHistory의 개념은 임의의 chain을 wrap할 수 있는 LangChain내의 클래스이다. ChatHistory은 chain의 입력과 출력을 따라가고, message 데이터 베이스에 저장된다. 앞으로의 상호작용은 메시지를 가져오고 입력의 일부로서 chain에 전달될 것이다.
+
+## Documents
+
+LangChain에서의 Document는 몇몇 데이터에 대한 정보를 저장한다. 두개의 attributes가 있다.
+
+- `page_content : str` : document의 내용이다. 현재는 문자열만 포함한다.
+- `metadata: dict` : document와 관련된 임의의 메타데이터이다. document id, filename 등을 포함한다.
+
+## Document loaders
+
+Document 객체를 불러오는 클래스이다. LangChain은 다양한 데이터 소스(슬랙, 노션, 구글 드라이브)로부터 다양한 데이터를 가져올 수 있는 integrations이 있다. 
+각각의 DocumentLoader은 그들의 파라미터를 가지고 있지만, `.load` 메서드를 통해서 실행가능하다.
+
+```python
+from langchain_community.document_loaders.csv_loader import CSVLoader
+
+loader = CSVLoader(
+    ...  # <-- Integration specific parameters here
+)
+data = loader.load()
+```
+## Text splitters
+
+documents를 불러올 떄, 너의 어플리케이션에 맞게 변환하고 싶을 것이다. 가장 쉬운 방법은 긴 document를 너의 모델의 컨텍스트에 맞춰서 작은 조각으로 나누는 것이다. LangChain은 내부에 쉽게 쪼개고, 합치고, 필터링하는 document transformers가 있다.
+긴 텍스트를 다룰 때, 텍스트를 조각으로 나누는 것은 중요하다. 쉽게 들리지만, 여기에는 잠재적 복잡성이 존재한다. 이상적으로, 문맥적으로 연관 있는(semantically related) 텍스트를 같이 두고 싶을 것이다. "semantically related"는 텍스트의 종류에 따라 다르다. 몇가지 방법을 소개하겠다.
+
+고수준에서의 text splitters는 다음과 같이 동작한다.
+
+1. 텍스트를 semantically meaningful한 조각으로 나눈다.(대개 문장 단위로)
+2. 작은 조각들을 특정 사이즈가 될 때까지 합친다.
+3. 특정 사이즈가 되었을 때, 조각을 하나의 텍스트로 만들고 덮어쓸 몇개의 텍스트 청크를 만든다.
+
+즉, text splitter를 커스터마이즈할 두가지 다른 방법이 있다.
+
+1. 어떻게 텍스트를 나눌 것인가
+2. 조각의 크기(다시 합칠)는 어떻게 되는가
+
+## Embedding models
+
+Embedding models은 텍스트를 벡터로 표현한다. 벡터는 일련의 숫자 또는 텍스트의 문맥적 의미를 저장한다. 텍스트를 이렇게 표현함으로서, 수학 연산을 적용할 수 있다. 자연어 검색 기능은 많은 유형의 context retrieval을 뒷받침하고 LLM에게 쿼리에 효과적으로 응답하는 데 필요한 관련 데이터를 제공합니다.
+
+`Embeddings` 클래스는 text embedding models을 중재하기(interfacing) 위해서 설계되었다. 다양한 model 제공자(OpenAI, Cohere, Hugging Face, etc)와 로컬 model이 있다. 클래스는 모든 model에 표준 interface를 제공한다.
+
+LangChain의 base Embeddings는 두개의 메서드를 제공한다. documents를 embedding하는 것과 쿼리를 embedding하는 것이다. 전자는 여러개의 텍스트를 가져오고, 후자는 단일 텍스트를 가져온다. 분리된 메서드를 가지는 이유는 몇몇 embedding 제공자가 documents(검색될)와 queries(검색 쿼리 그 자체)에 대해서 다른 embedding 메서드를 가지기 때문이다.
+
+## Vector stores
+
+비정형 데이터를 저장하고 검색하는 일반적인 방법은 embed하거나 resulting embedding vectors를 저장한 후에, 비정형 쿼리를 embed하고 embedded query와 '가장 유사한' embedding vectors를 가져오는 것이다.(?) vector store는 embedded data를 저장하고 벡터 검색을 수행한다.
+
+대부분의 vector stores는 embedded vectors에 대한 메타데이터를 저장하고 유사도 검색 이전에, 메타데이터를 필터링하고 리턴된 documents에 대한 조작을 허용한다.
+
+Vector stores는 다음과 같이 변환될 수 있다.
+
+```python
+vectorstore = MyVectorStore()
+retriever = vectorstore.as_retriever()
+```
+
+## Retrievers
+
+retriever는 비정형 쿼리에서 documents를 리턴하는 인터페이스이다. vector store보다 일반적이다. retriever는 documents를 저장할 필요는 없고, 그들을 return (or retrieve) 하기만 하면 된다. Retrievers는 vector stores로부터 생성되고, [위키피디아 검색](https://python.langchain.com/v0.2/docs/integrations/retrievers/wikipedia/)과 [Amazon Kendra](https://python.langchain.com/v0.2/docs/integrations/retrievers/amazon_kendra_retriever/)를 포함하기에 충분하다.
+
